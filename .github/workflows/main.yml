@@ -18,7 +18,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cpio lz4 xz-utils bzip2 gzip tar
+        sudo apt-get install -y cpio lz4 xz-utils bzip2 gzip tar file
 
     - name: Clone AIK Linux
       run: |
@@ -26,20 +26,26 @@ jobs:
 
     - name: Download & Bongkar File
       run: |
-        # Download file biner lo
+        # Download file biner lo langsung ke folder AIK
         curl -L -o aik/vendor_boot.img "${{ github.event.inputs.download_url }}"
         
-        # Masuk ke folder AIK dan eksekusi bongkar paksa pakai unpackimg
+        # Masuk ke folder AIK, pasang izin eksekusi ke semua script bawaan AIK
         cd aik
-        chmod +x unpackimg.sh
-        ./unpackimg.sh vendor_boot.img
+        chmod +x unpackimg.sh cleanup.sh bin/magic bin/unpackimg
         
-        # Pindahkan folder ramdisk hasil bongkaran ke luar biar bisa di-save
+        # Jalankan unpackimg.sh versi Linux bawaan osm0sis
+        ./unpackimg.sh --local vendor_boot.img
+        
+        # Bikin folder hasil di luar
         mkdir -p ../hasil_ekstrak
+        
+        # Copy isi ramdisk (tempat fstab berada) ke folder hasil
         if [ -d "ramdisk" ]; then
           cp -r ramdisk/* ../hasil_ekstrak/
+        elif [ -d "split_img" ]; then
+          cp -r split_img/* ../hasil_ekstrak/
         else
-          echo "Gagal unpack otomatis, coba copy file mentah"
+          echo "Format error atau unpack gagal"
           exit 1
         fi
 
@@ -48,10 +54,10 @@ jobs:
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Action"
         
-        # Masukkan hasil bongkaran ke dalam repository utama lo
+        # Pindahkan semua hasil ekstrak ke halaman utama repo lo
         cp -r hasil_ekstrak/* . || exit 0
         rm -rf aik hasil_ekstrak
         
         git add .
-        git commit -m "Bongkar paksa ramdisk via AIK" || exit 0
+        git commit -m "Bongkar paksa ramdisk sukses via AIK Fix" || exit 0
         git push origin main
