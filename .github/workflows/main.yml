@@ -1,4 +1,4 @@
-name: Otomatis Ekstrak Vendor Boot
+name: Bongkar Paksa Vendor Boot via AIK
 
 on:
   workflow_dispatch:
@@ -9,43 +9,49 @@ on:
         default: ''
 
 jobs:
-  ekstrak_tree:
+  bongkar_aik:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Repo
       uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-
-    - name: Install Dependencies & TWRPDTGEN
+    - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cpio lz4 xz-utils cpuid
-        pip install twrpdtgen
+        sudo apt-get install -y cpio lz4 xz-utils bzip2 gzip tar
 
-    - name: Download & Ekstrak File
+    - name: Clone AIK Linux
       run: |
-        mkdir input output
-        # Download file dari link yang lo input nanti
-        curl -L -o input/vendor_boot.img "${{ github.event.inputs.download_url }}"
+        git clone https://github.com/osm0sis/Android-Image-Kitchen.git aik
+
+    - name: Download & Bongkar File
+      run: |
+        # Download file biner lo
+        curl -L -o aik/vendor_boot.img "${{ github.event.inputs.download_url }}"
         
-        # Jalankan python twrpdtgen buat nyari fstab & generate device tree
-        python3 -m twrpdtgen input/vendor_boot.img -o output/
+        # Masuk ke folder AIK dan eksekusi bongkar paksa pakai unpackimg
+        cd aik
+        chmod +x unpackimg.sh
+        ./unpackimg.sh vendor_boot.img
+        
+        # Pindahkan folder ramdisk hasil bongkaran ke luar biar bisa di-save
+        mkdir -p ../hasil_ekstrak
+        if [ -d "ramdisk" ]; then
+          cp -r ramdisk/* ../hasil_ekstrak/
+        else
+          echo "Gagal unpack otomatis, coba copy file mentah"
+          exit 1
+        fi
 
     - name: Simpan Hasil ke Repository
       run: |
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Action"
         
-        # Pindahkan hasil ekstraksi ke root repository
-        cp -r output/*/* .
-        rm -rf input output
+        # Masukkan hasil bongkaran ke dalam repository utama lo
+        cp -r hasil_ekstrak/* . || exit 0
+        rm -rf aik hasil_ekstrak
         
-        # Auto commit balik ke repo lo
         git add .
-        git commit -m "Update Device Tree otomatis dari GitHub Action" || exit 0
+        git commit -m "Bongkar paksa ramdisk via AIK" || exit 0
         git push origin main
-        
