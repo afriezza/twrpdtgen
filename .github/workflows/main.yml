@@ -18,43 +18,36 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cpio lz4 xz-utils bzip2 gzip tar file findutils
+        sudo apt-get install -y cpio lz4 xz-utils bzip2 gzip tar file
 
-    - name: Clone AIK Linux
+    - name: Clone AIK Linux Resmi
       run: |
-        git clone https://github.com/osm0sis/Android-Image-Kitchen.git aik
+        # Mengunci langsung ke branch Linux resmi osm0sis agar file lengkap
+        git clone -b android-image-kitchen https://github.com/osm0sis/Android-Image-Kitchen.git aik
 
     - name: Download & Bongkar File
       run: |
-        # Download file biner lo ke root dulu
+        cd aik
+        
+        # Download biner langsung ke folder aik
         curl -L -o vendor_boot.img "${{ github.event.inputs.download_url }}"
         
-        # Cari otomatis di mana folder yang ada unpackimg.sh nya
-        AIK_DIR=$(find . -name "unpackimg.sh" -exec dirname {} \; | head -n 1)
-        echo "AIK ditemukan di folder: $AIK_DIR"
-        
-        # Pindahin file .img ke folder AIK tersebut
-        mv vendor_boot.img "$AIK_DIR/"
-        
-        # Masuk ke folder AIK aslinya
-        cd "$AIK_DIR"
-        
-        # Kasih izin eksekusi secara massal ke semua file script dan biner
+        # Beri izin eksekusi penuh secara massal
         chmod -R +x .
         
-        # Jalankan unpackimg.sh bawaan AIK
+        # Jalankan unpackimg.sh versi Linux bawaan
         ./unpackimg.sh --local vendor_boot.img
         
-        # Bikin folder penampung hasil di luar
-        mkdir -p ../../hasil_ekstrak
+        # Buat folder penampung hasil di luar
+        mkdir -p ../hasil_ekstrak
         
-        # Pindahin hasil ekstraksi ramdisk (fstab ada di sini)
+        # Pindahkan isi ramdisk atau split_img tempat fstab berada
         if [ -d "ramdisk" ]; then
-          cp -r ramdisk/* ../../hasil_ekstrak/
+          cp -r ramdisk/* ../hasil_ekstrak/
         elif [ -d "split_img" ]; then
-          cp -r split_img/* ../../hasil_ekstrak/
+          cp -r split_img/* ../hasil_ekstrak/
         else
-          echo "AIK gagal ngebongkar format ramdisk ini"
+          echo "AIK gagal ngebongkar ramdisk ini"
           exit 1
         fi
 
@@ -63,10 +56,10 @@ jobs:
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Action"
         
-        # Pindahkan semua hasil bongkaran ke root repository lo
+        # Pindahkan semua hasil ekstrak ke root repository lo
         cp -r hasil_ekstrak/* . || exit 0
-        rm -rf aik hasil_ekstrak vendor_boot.img
+        rm -rf aik hasil_ekstrak
         
         git add .
-        git commit -m "Bongkar paksa ramdisk sukses via AIK Auto-Path" || exit 0
+        git commit -m "Bongkar paksa ramdisk sukses via AIK Fix Branch" || exit 0
         git push origin main
