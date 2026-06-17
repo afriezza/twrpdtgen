@@ -1,53 +1,40 @@
-name: Bongkar Paksa Vendor Boot via AIK
+name: Bongkar Manual Tanpa Tool
 
 on:
   workflow_dispatch:
     inputs:
       download_url:
-        description: 'Link download vendor_boot.img dari Releases lo'
+        description: 'Link download vendor_boot.img'
         required: true
         default: ''
 
 jobs:
-  bongkar_aik:
+  bongkar_manual:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Repo
       uses: actions/checkout@v4
 
-    - name: Install Dependencies
+    - name: Install Tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y cpio lz4 xz-utils bzip2 gzip tar file
+        sudo apt-get install -y cpio lz4 xz-utils gzip
 
-    - name: Clone AIK Linux Resmi
+    - name: Download & Bongkar Paksa
       run: |
-        # Langsung kunci ke branch khusus Linux biar file unpackimg.sh nya ada
-        git clone -b android-image-kitchen https://github.com/osm0sis/Android-Image-Kitchen.git aik
-
-    - name: Download & Bongkar File
-      run: |
-        cd aik
-        # Download file biner lo langsung ke folder aik
+        mkdir -p hasil_ramdisk
+        # Download file img lo
         curl -L -o vendor_boot.img "${{ github.event.inputs.download_url }}"
         
-        # Kasih izin eksekusi penuh ke semua file di dalam folder aik
-        chmod -R +x .
-        
-        # Jalankan eksekusi unpackimg bawaan AIK Linux
-        ./unpackimg.sh --local vendor_boot.img
-        
-        # Bikin folder penampung buat nyimpen hasil mentah ramdisk
-        mkdir -p ../hasil_ekstrak
-        
-        # Pindahkan folder ramdisk atau split_img (isi fstab ada di dalam sini)
-        if [ -d "ramdisk" ]; then
-          cp -r ramdisk/* ../hasil_ekstrak/
-        elif [ -d "split_img" ]; then
-          cp -r split_img/* ../hasil_ekstrak/
-        else
-          echo "AIK gagal total ngebongkar"
-          exit 1
+        # Cari posisi header LZ4 (Hex: 02 21 4C 18) di dalam file .img
+        # Terus potong dan ekstrak otomatis ke folder hasil
+        echo "Memulai pencarian ramdisk lz4..."
+        grep -a -b -o -P '\x02\x21\x4C\x18' vendor_boot.img | head -n 1 | cut -d: -f1 | xargs -I {} dd if=vendor_boot.img bs=1 skip={} | lz4 -d | (cd hasil_ramdisk && cpio -idmv) || true
+
+        # Kalau misal ramdisk lo pake Gzip (Hex: 1F 8B), ini cadangannya:
+        if [ -z "$(ls -A hasil_ramdisk)" ]; then
+          echo "Format LZ4 gagal, mencoba format GZIP..."
+          grep -a -b -o -P '\x1F\x8B' vendor_boot.img | head -n 1 | cut -d: -f1 | xargs -I {} dd if=vendor_boot.img bs=1 skip={} | gzip -d | (cd hasil_ramdisk && cpio -idmv) || true
         fi
 
     - name: Simpan Hasil ke Repository
@@ -55,10 +42,16 @@ jobs:
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Action"
         
-        # Pindahkan semua isi hasil bongkaran ke halaman depan repository lo
-        cp -r hasil_ekstrak/* . || exit 0
-        rm -rf aik hasil_ekstrak
+        # Pindahkan isi ramdisk ke root repository lo biar fstab-nya kelihatan
+        if [ -d "hasil_ramdisk" ] && [ "$(ls -A hasil_ramdisk)" ]; then
+          cp -r hasil_ramdisk/* .
+        else
+          echo "Semua metode gagal ngebongkar!"
+          exit 1
+        fi
+        
+        rm -rf hasil_ramdisk vendor_boot.img
         
         git add .
-        git commit -m "Bongkar paksa ramdisk sukses via AIK Fix Branch" || exit 0
+        git commit -m "Ekstrak paksa ramdisk sukses" || exit 0
         git push origin main
