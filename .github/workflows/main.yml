@@ -22,32 +22,31 @@ jobs:
 
     - name: Clone AIK Linux Resmi
       run: |
-        # Mengunci langsung ke branch Linux resmi osm0sis agar file lengkap
+        # Langsung kunci ke branch khusus Linux biar file unpackimg.sh nya ada
         git clone -b android-image-kitchen https://github.com/osm0sis/Android-Image-Kitchen.git aik
 
     - name: Download & Bongkar File
       run: |
         cd aik
-        
-        # Download biner langsung ke folder aik
+        # Download file biner lo langsung ke folder aik
         curl -L -o vendor_boot.img "${{ github.event.inputs.download_url }}"
         
-        # Beri izin eksekusi penuh secara massal
+        # Kasih izin eksekusi penuh ke semua file di dalam folder aik
         chmod -R +x .
         
-        # Jalankan unpackimg.sh versi Linux bawaan
+        # Jalankan eksekusi unpackimg bawaan AIK Linux
         ./unpackimg.sh --local vendor_boot.img
         
-        # Buat folder penampung hasil di luar
+        # Bikin folder penampung buat nyimpen hasil mentah ramdisk
         mkdir -p ../hasil_ekstrak
         
-        # Pindahkan isi ramdisk atau split_img tempat fstab berada
+        # Pindahkan folder ramdisk atau split_img (isi fstab ada di dalam sini)
         if [ -d "ramdisk" ]; then
           cp -r ramdisk/* ../hasil_ekstrak/
         elif [ -d "split_img" ]; then
           cp -r split_img/* ../hasil_ekstrak/
         else
-          echo "AIK gagal ngebongkar ramdisk ini"
+          echo "AIK gagal total ngebongkar"
           exit 1
         fi
 
@@ -56,7 +55,7 @@ jobs:
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Action"
         
-        # Pindahkan semua hasil ekstrak ke root repository lo
+        # Pindahkan semua isi hasil bongkaran ke halaman depan repository lo
         cp -r hasil_ekstrak/* . || exit 0
         rm -rf aik hasil_ekstrak
         
