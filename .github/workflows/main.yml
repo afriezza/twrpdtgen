@@ -8,6 +8,9 @@ on:
         required: true
         default: ''
 
+# MANTRA INI UNTUK NGEJEBOL GEMBOK WRITE PERMISSION OTOMATIS
+permissions: write-all
+
 jobs:
   bongkar_manual:
     runs-on: ubuntu-latest
@@ -23,15 +26,11 @@ jobs:
     - name: Download & Bongkar Paksa
       run: |
         mkdir -p hasil_ramdisk
-        # Download file img lo
         curl -L -o vendor_boot.img "${{ github.event.inputs.download_url }}"
         
-        # Cari posisi header LZ4 (Hex: 02 21 4C 18) di dalam file .img
-        # Terus potong dan ekstrak otomatis ke folder hasil
         echo "Memulai pencarian ramdisk lz4..."
         grep -a -b -o -P '\x02\x21\x4C\x18' vendor_boot.img | head -n 1 | cut -d: -f1 | xargs -I {} dd if=vendor_boot.img bs=1 skip={} | lz4 -d | (cd hasil_ramdisk && cpio -idmv) || true
 
-        # Kalau misal ramdisk lo pake Gzip (Hex: 1F 8B), ini cadangannya:
         if [ -z "$(ls -A hasil_ramdisk)" ]; then
           echo "Format LZ4 gagal, mencoba format GZIP..."
           grep -a -b -o -P '\x1F\x8B' vendor_boot.img | head -n 1 | cut -d: -f1 | xargs -I {} dd if=vendor_boot.img bs=1 skip={} | gzip -d | (cd hasil_ramdisk && cpio -idmv) || true
@@ -42,7 +41,6 @@ jobs:
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Action"
         
-        # Pindahkan isi ramdisk ke root repository lo biar fstab-nya kelihatan
         if [ -d "hasil_ramdisk" ] && [ "$(ls -A hasil_ramdisk)" ]; then
           cp -r hasil_ramdisk/* .
         else
