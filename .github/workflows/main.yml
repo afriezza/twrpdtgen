@@ -54,4 +54,4 @@ jobs:
         
         git add .
         git commit -m "Ekstrak paksa ramdisk sukses" || exit 0
-        git push origin main
+        git push origin master
